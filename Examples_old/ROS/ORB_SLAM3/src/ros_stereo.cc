@@ -158,11 +158,13 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
         cv::Mat imLeft, imRight;
         cv::remap(cv_ptrLeft->image,imLeft,M1l,M2l,cv::INTER_LINEAR);
         cv::remap(cv_ptrRight->image,imRight,M1r,M2r,cv::INTER_LINEAR);
-        mpSLAM->TrackStereo(imLeft,imRight,cv_ptrLeft->header.stamp.toSec());
+        bool  isKeyFrame = false;
+        mpSLAM->TrackStereo(imLeft,imRight,cv_ptrLeft->header.stamp.toSec(), isKeyFrame);
     }
     else
     {
-        mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec());
+        bool  isKeyFrame = false;
+        mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec(),isKeyFrame);
     }
 
 }

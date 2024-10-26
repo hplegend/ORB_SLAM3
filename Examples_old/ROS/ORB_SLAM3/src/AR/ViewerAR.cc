@@ -19,7 +19,7 @@
 #include "ViewerAR.h"
 
 #include <opencv2/highgui/highgui.hpp>
-
+#include "../../../include/Converter.h"
 #include <mutex>
 #include <thread>
 #include <cstdlib>

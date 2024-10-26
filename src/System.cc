@@ -185,11 +185,33 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpFrameDrawer = new FrameDrawer(mpAtlas);
     mpMapDrawer = new MapDrawer(mpAtlas, strSettingsFile, settings_);
 
+
+    // 稠密重建
+    // 对STEREO和RGBD相机重建
+    if(mSensor == IMU_STEREO || mSensor == STEREO || mSensor == IMU_RGBD || mSensor == RGBD){
+        // 获取参数
+        float resolution = fsSettings["PointCloudMapping.Resolution"];
+        float meank = fsSettings["PointCloudMapping.MeanK"];
+        float stdthresh = fsSettings["PointCloudMapping.StdThresh"];
+        float unit = fsSettings["PointCloudMapping.Unit"];
+        cv::FileNode node_mindisp = fsSettings["PointCloudMapping.mindisp"];
+        cv::FileNode node_maxdisp = fsSettings["PointCloudMapping.maxdisp"];
+        if(node_maxdisp.empty() || node_maxdisp.empty()){
+            // 提供视差图
+            mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution,meank,stdthresh,unit);
+        } else{
+            // 不提供视差图,使用视差算法
+            mpPointCloudMapping = std::make_shared<PointCloudMapping>(resolution,meank,stdthresh,unit,float(node_mindisp),float(node_maxdisp));
+        }
+
+    }
+
+
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
     cout << "Seq. Name: " << strSequence << endl;
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+                             mpAtlas, mpPointCloudMapping,mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
@@ -241,7 +263,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
 }
 
-Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas, string filename)
+Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, bool & isKeyFrame, const vector<IMU::Point>& vImuMeas, string filename)
 {
     if(mSensor!=STEREO && mSensor!=IMU_STEREO)
     {
@@ -313,7 +335,7 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
             mpTracker->GrabImuData(vImuMeas[i_imu]);
 
     // std::cout << "start GrabImageStereo" << std::endl;
-    Sophus::SE3f Tcw = mpTracker->GrabImageStereo(imLeftToFeed,imRightToFeed,timestamp,filename);
+    Sophus::SE3f Tcw = mpTracker->GrabImageStereo(imLeftToFeed,imRightToFeed,timestamp,filename,isKeyFrame);
 
     // std::cout << "out grabber" << std::endl;
 
@@ -1544,6 +1566,12 @@ string System::CalculateCheckSum(string filename, int type)
 
     return checksum;
 }
+
+    void System::SaveMap(const std::string &filename, const int col,  const int row) {
+    // 假设只有一个地图
+        Map *currentMap = mpAtlas->GetCurrentMap();
+        currentMap->Save(filename, col, row);
+    }
 
 } //namespace ORB_SLAM
 

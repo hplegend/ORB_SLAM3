@@ -38,13 +38,14 @@
 #include "Settings.h"
 
 #include "GeometricCamera.h"
+#include "PointCloudMapping.h"
 
 #include <mutex>
 #include <unordered_set>
 
 namespace ORB_SLAM3
 {
-
+class PointCloudMapping;
 class Viewer;
 class FrameDrawer;
 class Atlas;
@@ -58,7 +59,7 @@ class Tracking
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
+    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas, std::shared_ptr<PointCloudMapping> pPointCloudMapping,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, Settings* settings, const string &_nameSeq=std::string());
 
     ~Tracking();
@@ -69,7 +70,7 @@ public:
     bool ParseIMUParamFile(cv::FileStorage &fSettings);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    Sophus::SE3f GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, string filename);
+    Sophus::SE3f GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, string filename, bool & isKeyFrame);
     Sophus::SE3f GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, string filename);
     Sophus::SE3f GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename);
 
@@ -139,8 +140,15 @@ public:
     Frame mLastFrame;
 
     cv::Mat mImGray;
+    cv::Mat mImColor;
+    cv::Mat mImdepth;
 
-    // Initialization Variables (Monocular)
+    cv::Mat mImRight_Stereo;
+    cv::Mat disp;
+    cv::Mat Q;
+
+
+        // Initialization Variables (Monocular)
     std::vector<int> mvIniLastMatches;
     std::vector<int> mvIniMatches;
     std::vector<cv::Point2f> mvbPrevMatched;
@@ -195,7 +203,7 @@ public:
 protected:
 
     // Main tracking function. It is independent of the input sensor.
-    void Track();
+    void Track(bool& isKeyframe);
 
     // Map initialization for stereo and RGB-D
     void StereoInitialization();
@@ -368,6 +376,9 @@ protected:
 
 public:
     cv::Mat mImRight;
+
+    // for point cloud viewing
+    shared_ptr<PointCloudMapping> mpPointCloudMapping;
 };
 
 } //namespace ORB_SLAM

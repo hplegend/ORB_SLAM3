@@ -41,14 +41,14 @@ namespace ORB_SLAM3
 {
 
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, Settings* settings, const string &_nameSeq):
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Atlas *pAtlas, std::shared_ptr<PointCloudMapping> pPointCloudMapping, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, Settings* settings, const string &_nameSeq):
     mState(NO_IMAGES_YET), mSensor(sensor), mTrackedFr(0), mbStep(false),
     mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB),
-    mbReadyToInitializate(false), mpSystem(pSys), mpViewer(NULL), bStepByStep(false),
+    mbReadyToInitializate(false), mpSystem(pSys), mpViewer(NULL), bStepByStep(false), mpPointCloudMapping(pPointCloudMapping),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpAtlas(pAtlas), mnLastRelocFrameId(0), time_recently_lost(5.0),
     mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr), mpLastKeyFrame(static_cast<KeyFrame*>(NULL))
 {
-    // Load camera parameters from settings file
+    // Load camera parameters from settings file version=1.0,会从这里开始读取
     if(settings){
         newParameterLoader(settings);
     }
@@ -594,8 +594,11 @@ void Tracking::newParameterLoader(Settings *settings) {
 
     mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO){
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+        // 稠密重建
+        this->Q = settings->Q;
+    }
 
     if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
         mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
@@ -621,6 +624,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
     mDistCoef = cv::Mat::zeros(4,1,CV_32F);
     cout << endl << "Camera Parameters: " << endl;
     bool b_miss_params = false;
+
+    // 稠密重建
+    if(mSensor == System::STEREO || mSensor == System::IMU_STEREO){
+        this->Q = fSettings["Q"].mat();
+    }
 
     string sCameraName = fSettings["Camera.type"];
     if(sCameraName == "PinHole")
@@ -1451,13 +1459,17 @@ bool Tracking::GetStepByStep()
 
 
 
-Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, string filename)
+Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, string filename, bool & isKeyFrame)
 {
     //cout << "GrabImageStereo" << endl;
 
     mImGray = imRectLeft;
     cv::Mat imGrayRight = imRectRight;
     mImRight = imRectRight;
+
+    // get the dense mapping data
+    mImColor = imRectLeft.clone();
+    mImRight_Stereo = imRectRight.clone();
 
     if(mImGray.channels()==3)
     {
@@ -1510,7 +1522,7 @@ Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat 
 #endif
 
     //cout << "Tracking start" << endl;
-    Track();
+    Track(isKeyFrame);
     //cout << "Tracking end" << endl;
 
     return mCurrentFrame.GetPose();
@@ -1557,7 +1569,9 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
     vdORBExtract_ms.push_back(mCurrentFrame.mTimeORB_Ext);
 #endif
 
-    Track();
+    bool isKeyFrame  = false;
+
+    Track(isKeyFrame);
 
     return mCurrentFrame.GetPose();
 }
@@ -1609,7 +1623,8 @@ Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &times
 #endif
 
     lastID = mCurrentFrame.mnId;
-    Track();
+    bool  isKeyFrame = false;
+    Track(isKeyFrame);
 
     return mCurrentFrame.GetPose();
 }
@@ -1791,7 +1806,7 @@ void Tracking::ResetFrameIMU()
 }
 
 
-void Tracking::Track()
+void Tracking::Track(bool& isKeyframe)
 {
 
     if (bStepByStep)
@@ -2246,8 +2261,11 @@ void Tracking::Track()
             // Check if we need to insert a new keyframe
             // if(bNeedKF && bOK)
             if(bNeedKF && (bOK || (mInsertKFsLost && mState==RECENTLY_LOST &&
-                                   (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD))))
+                                   (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)))) {
                 CreateNewKeyFrame();
+                isKeyframe = true;
+            }
+
 
 #ifdef REGISTER_TIMES
             std::chrono::steady_clock::time_point time_EndNewKF = std::chrono::steady_clock::now();
@@ -3338,6 +3356,26 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+
+
+    // 稠密重建
+//    if (mSensor == System::RGBD || mSensor == System::IMU_RGBD)
+//    {
+//        mpPointCloudMapping->insertKeyFrame(pKF, this->mImColor, this->mImdepth);
+//    }
+//    else if (mSensor == System::STEREO || mSensor == System::IMU_STEREO)
+//    {
+//        if (disp.empty())
+//        {
+//            mpPointCloudMapping->insertKeyFrame(pKF, this->mImColor, this->mImRight_Stereo, Q);
+//        }
+//        else
+//        {
+//            mpPointCloudMapping->insertKeyFrame(pKF, this->mImColor, this->mImRight_Stereo, this->disp, Q);
+//        }
+//    }
+
+
 }
 
 void Tracking::SearchLocalPoints()

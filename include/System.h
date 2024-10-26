@@ -39,7 +39,7 @@
 #include "Viewer.h"
 #include "ImuTypes.h"
 #include "Settings.h"
-
+#include "PointCloudMapping.h"
 
 namespace ORB_SLAM3
 {
@@ -71,6 +71,7 @@ public:
     }
 };
 
+class PointCloudMapping;
 class Viewer;
 class FrameDrawer;
 class MapDrawer;
@@ -107,7 +108,7 @@ public:
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
-    Sophus::SE3f TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
+    Sophus::SE3f TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, bool &isKeyFrame, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
 
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -151,6 +152,9 @@ public:
     // Call first Shutdown()
     // See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
     void SaveKeyFrameTrajectoryTUM(const string &filename);
+
+    void SaveMap(const string &filename,const int col,  const int row);
+
 
     void SaveTrajectoryEuRoC(const string &filename);
     void SaveKeyFrameTrajectoryEuRoC(const string &filename);
@@ -262,6 +266,9 @@ private:
     string mStrVocabularyFilePath;
 
     Settings* settings_;
+
+    // for dense mapping
+    shared_ptr<PointCloudMapping> mpPointCloudMapping;
 };
 
 }// namespace ORB_SLAM

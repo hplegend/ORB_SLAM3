@@ -266,8 +266,8 @@ void ImageGrabber::SyncWithImu()
         cv::remap(imLeft,imLeft,M1l,M2l,cv::INTER_LINEAR);
         cv::remap(imRight,imRight,M1r,M2r,cv::INTER_LINEAR);
       }
-
-      mpSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
+ bool  isKeyFrame = false;
+      mpSLAM->TrackStereo(imLeft,imRight,tImLeft,isKeyFrame ,vImuMeas);
 
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);

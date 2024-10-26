@@ -259,7 +259,8 @@ int main(int argc, char **argv)
     #endif
 
             // Pass the images to the SLAM system
-            SLAM.TrackStereo(imLeftRect,imRightRect,tframe,vImuMeas);
+            bool isKeyFrame = false;
+            SLAM.TrackStereo(imLeftRect,imRightRect,tframe, isKeyFrame, vImuMeas);
 
     #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();

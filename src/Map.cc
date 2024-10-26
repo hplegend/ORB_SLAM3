@@ -491,4 +491,90 @@ void Map::PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long u
 }
 
 
+// 对关键帧相关数据进行保存
+void Map::Save(const string &filename,const int col,  const int row)
+{
+        std::cout << "SFM Saving to "<< filename << std::endl;
+        ofstream f;
+        f.open(filename.c_str());
+
+        f << "MVS "<< col << " "<< row << endl;
+        // 输出关键帧的数量
+        cout << "The number of KeyFrames: " << mspKeyFrames.size() << endl;
+
+        unsigned long int nKeyFrames = mspKeyFrames.size();
+        f << nKeyFrames << endl;
+        int index = 1;
+        for(auto kf:mspKeyFrames){
+            cout << "save KeyFrames: " << index << endl;
+            SaveKeyFrame(f,kf);
+            index = index + 1;
+        }
+
+        // 输出空间三维点的数目
+        cout << "The number of MapPoints: " << mspMapPoints.size() << endl;
+        unsigned long int nMapPoints = mspMapPoints.size();
+        f << nMapPoints << endl;
+
+        int mpIndex = 1;
+        for(auto mp:mspMapPoints) {
+            cout << "save KeyFrames: " << mpIndex << endl;
+            SaveMapPoint(f,mp);
+            mpIndex = mpIndex +1 ;
+        }
+        f.close();
+}
+
+//  保存地图点
+void Map::SaveMapPoint(ofstream &f, MapPoint *mp)
+{
+        // 保存当前MapPoint世界坐标值
+        Eigen::Vector3f mpWorldPos = mp->GetWorldPos();
+        f <<" " <<mpWorldPos[0]<<" " << mpWorldPos[1]<<" " << mpWorldPos[2] << " ";
+        f << (mp->nObs)/2<< " ";
+
+        std::map<KeyFrame*,std::tuple<int,int>> mapObservation = mp->GetObservations();
+        for(auto mit = mapObservation.begin(); mit != mapObservation.end(); mit++)
+        {
+            int Frameid;
+            Frameid = mit->first->mnId;
+            auto keyid = find(KeyId.begin(),KeyId.end(),Frameid) - KeyId.begin();
+            f << keyid << " ";
+        }
+        f << "\n";
+}
+
+//  保存关键帧
+    void Map::SaveKeyFrame(ofstream &f, KeyFrame *kf) {
+        KeyId.push_back(kf->mnId);
+        // 保存当前关键帧的id
+        f << KeyId.end() - KeyId.begin() - 1 << " ";
+        // 关键帧内参
+        f << kf->fx << " " << kf->fy << " " << kf->cx << " " << kf->cy << " ";
+        // 保存当前关键帧的位姿
+        Sophus::SE3f Tcw = kf->GetPose();
+        cout << "GetPose " << std::to_string(kf->mTimeStamp) << endl;
+        cv::Mat Rcw;
+        cv::eigen2cv(Tcw.rotationMatrix(), Rcw);
+        cout << "Rcw\n" << Rcw << endl;
+        // 通过四元数保存旋转矩阵
+        std::vector<float> Quat = Converter::toQuaternion(Rcw);
+
+        for (int i = 0; i < 4; i++) {
+            f << Quat[(3 + i) % 4] << " ";// qw qx qy qz
+        }
+        //保存平移
+        cv::Mat Tscw;
+        cv::eigen2cv(Tcw.translation(), Tscw);
+        cout << "Tscw\n" << Tscw << endl;
+        for (int i = 0; i < 3; i++) {
+            f << Tscw.at<float>(i,0) << " ";
+        }
+        ostringstream sTimeStamp;
+        sTimeStamp << std::to_string(kf->mTimeStamp);
+        f << sTimeStamp.str();
+        f << "\n";
+    }
+
+
 } //namespace ORB_SLAM3

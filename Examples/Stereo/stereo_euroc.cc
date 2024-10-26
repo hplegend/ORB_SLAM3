@@ -91,6 +91,7 @@ int main(int argc, char **argv)
     ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO, true);
 
     cv::Mat imLeft, imRight;
+    int imageHight, imageWidth;
     for (seq = 0; seq<num_seq; seq++)
     {
 
@@ -105,6 +106,8 @@ int main(int argc, char **argv)
             // Read left and right images from file
             imLeft = cv::imread(vstrImageLeft[seq][ni],cv::IMREAD_UNCHANGED); //,cv::IMREAD_UNCHANGED);
             imRight = cv::imread(vstrImageRight[seq][ni],cv::IMREAD_UNCHANGED); //,cv::IMREAD_UNCHANGED);
+            imageWidth = imLeft.rows;
+            imageHight = imLeft.cols;
 
             if(imLeft.empty())
             {
@@ -129,7 +132,8 @@ int main(int argc, char **argv)
     #endif
 
             // Pass the images to the SLAM system
-            SLAM.TrackStereo(imLeft,imRight,tframe, vector<ORB_SLAM3::IMU::Point>(), vstrImageLeft[seq][ni]);
+            bool isKeyFrame = false;
+            SLAM.TrackStereo(imLeft,imRight,tframe, isKeyFrame, vector<ORB_SLAM3::IMU::Point>(), vstrImageLeft[seq][ni]);
 
     #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -175,11 +179,13 @@ int main(int argc, char **argv)
         const string f_file =  "f_" + string(argv[argc-1]) + ".txt";
         SLAM.SaveTrajectoryEuRoC(f_file);
         SLAM.SaveKeyFrameTrajectoryEuRoC(kf_file);
+        SLAM.SaveMap("mapPoint.txt", imageHight, imageWidth);
     }
     else
     {
         SLAM.SaveTrajectoryEuRoC("CameraTrajectory.txt");
         SLAM.SaveKeyFrameTrajectoryEuRoC("KeyFrameTrajectory.txt");
+        SLAM.SaveMap("mapPoint.txt", imageHight, imageWidth);
     }
 
     return 0;
@@ -206,6 +212,7 @@ void LoadImages(const string &strPathLeft, const string &strPathRight, const str
             double t;
             ss >> t;
             vTimeStamps.push_back(t/1e9);
+            // vTimeStamps.push_back(t);
 
         }
     }

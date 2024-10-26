@@ -28,7 +28,8 @@
 #include <mutex>
 
 #include <boost/serialization/base_object.hpp>
-
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/core.hpp>
 
 namespace ORB_SLAM3
 {
@@ -155,6 +156,11 @@ public:
     std::set<long unsigned int> msOptKFs;
     std::set<long unsigned int> msFixedKFs;
 
+    // for save information
+    void Save(const string &filename,const int col,  const int row);
+    void SaveMapPoint(ofstream &f, MapPoint* mp);
+    void SaveKeyFrame(ofstream &f, KeyFrame* kf);
+
 protected:
 
     long unsigned int mnId;
@@ -200,6 +206,8 @@ protected:
 
     // Mutex
     std::mutex mMutexMap;
+
+    std::vector<int> KeyId;
 
 };
 

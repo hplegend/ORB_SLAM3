@@ -14,12 +14,12 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
    add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++11.")
+   message(STATUS "Using flag -std=c++14.")
 elseif(COMPILER_SUPPORTS_CXX0X)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
    add_definitions(-DCOMPILEDWITHC0X)
@@ -41,6 +41,7 @@ MESSAGE(${OpenCV_VERSION})
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(realsense2)
+find_package(PCL REQUIRED)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -49,7 +50,13 @@ ${PROJECT_SOURCE_DIR}/include/CameraModels
 ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
+${PCL_INCLUDE_DIRS}
 )
+
+
+# FOR PCL
+add_definitions( ${PCL_DEFINITIONS} )
+link_directories( ${PCL_LIBRARY_DIRS} )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
@@ -82,6 +89,8 @@ src/GeometricTools.cc
 src/TwoViewReconstruction.cc
 src/Config.cc
 src/Settings.cc
+src/StereoMatch.cc
+src/PointCloudMapping.cc
 include/System.h
 include/Tracking.h
 include/LocalMapping.h
@@ -111,7 +120,10 @@ include/GeometricTools.h
 include/TwoViewReconstruction.h
 include/SerializationUtils.h
 include/Config.h
-include/Settings.h)
+include/Settings.h
+include/StereoMatch.h
+include/PointCloudMapping.h
+)
 
 add_subdirectory(Thirdparty/g2o)
 
@@ -121,6 +133,8 @@ ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
+${PROJECT_SOURCE_DIR}/Thirdparty/elas/lib/libelas.so
+${PCL_LIBRARIES}
 -lboost_serialization
 -lcrypto
 )
@@ -175,6 +189,10 @@ target_link_libraries(stereo_euroc ${PROJECT_NAME})
 add_executable(stereo_tum_vi
         Examples/Stereo/stereo_tum_vi.cc)
 target_link_libraries(stereo_tum_vi ${PROJECT_NAME})
+
+add_executable(stereo_maize
+        Examples/Stereo/stereo_maize.cc)
+target_link_libraries(stereo_maize ${PROJECT_NAME})
 
 if(realsense2_FOUND)
     add_executable(stereo_realsense_t265
@@ -246,6 +264,10 @@ target_link_libraries(stereo_inertial_euroc ${PROJECT_NAME})
 add_executable(stereo_inertial_tum_vi
         Examples/Stereo-Inertial/stereo_inertial_tum_vi.cc)
 target_link_libraries(stereo_inertial_tum_vi ${PROJECT_NAME})
+
+add_executable(stereo_inertial_maize
+        Examples/Stereo-Inertial/stereo_inertial_maize.cc)
+target_link_libraries(stereo_inertial_maize ${PROJECT_NAME})
 
 if(realsense2_FOUND)
     add_executable(stereo_inertial_realsense_t265
